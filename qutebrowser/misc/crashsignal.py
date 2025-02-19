@@ -355,16 +355,20 @@ class SignalHandler(QObject):
         if utils.is_posix and hasattr(signal, 'set_wakeup_fd'):
             # pylint: disable=import-error,no-member,useless-suppression
             import fcntl
-            read_fd, write_fd = os.pipe()
-            for fd in [read_fd, write_fd]:
-                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-                fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-            self._notifier = QSocketNotifier(cast(sip.voidptr, read_fd),
-                                             QSocketNotifier.Type.Read,
-                                             self)
-            self._notifier.activated.connect(self.handle_signal_wakeup)
-            self._orig_wakeup_fd = signal.set_wakeup_fd(write_fd)
-            # pylint: enable=import-error,no-member,useless-suppression
+            try:
+                read_fd, write_fd = os.pipe()
+                for fd in [read_fd, write_fd]:
+                    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                self._notifier = QSocketNotifier(cast(sip.voidptr, read_fd),
+                                                 QSocketNotifier.Type.Read,
+                                                 self)
+                self._notifier.activated.connect(self.handle_signal_wakeup)
+                self._orig_wakeup_fd = signal.set_wakeup_fd(write_fd)
+                # pylint: enable=import-error,no-member,useless-suppression
+            except TypeError as e:
+                message.error(str(e))
+                self._notifier = None
         else:
             self._timer.start(1000)
             self._timer.timeout.connect(lambda: None)
